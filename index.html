@@ -1,0 +1,741 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The Chronos-Deck 2.0 – AI Study & Task Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      :root {
+        --bg: #0b0f13;
+        --panel: #121821;
+        --panel-2: #0f151e;
+        --text: #e5e7eb;
+        --muted: #9aa3af;
+        --primary: #60a5fa;
+        --primary-2: #93c5fd;
+        --accent: #22d3ee;
+        --danger: #f87171;
+        --success: #34d399;
+        --warning: #fbbf24;
+        --border: #1f2937;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body { margin: 0; background: var(--bg); color: var(--text); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+      .app { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+      .sidebar { background: var(--panel); border-right: 1px solid var(--border); padding: 16px; }
+      .brand { font-weight: 700; font-size: 18px; margin-bottom: 12px; }
+      .tagline { color: var(--muted); font-size: 12px; margin-bottom: 16px; }
+      .nav button { display: block; width: 100%; text-align: left; padding: 10px 12px; border-radius: 8px; background: transparent; color: var(--text); border: 1px solid transparent; cursor: pointer; margin-bottom: 6px; }
+      .nav button.active { background: var(--panel-2); border-color: var(--border); }
+      .nav button:hover { background: #0d131b; }
+      .content { padding: 20px; }
+      .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+      .row { display: grid; grid-template-columns: 1fr; gap: 16px; }
+      @media (min-width: 900px) { .row-2 { grid-template-columns: 1fr 1fr; } }
+      @media (min-width: 1100px) { .row-3 { grid-template-columns: 1fr 1fr 1fr; } }
+      .input, select, .btn { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 10px 12px; }
+      .btn { cursor: pointer; }
+      .btn-primary { background: #0f2a44; border-color: #103454; color: var(--primary-2); }
+      .btn-primary:hover { background: #143453; }
+      .btn-danger { background: #3a1414; border-color: #4a1a1a; color: var(--danger); }
+      .btn-muted { background: var(--panel-2); color: var(--muted); }
+      .pill { display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; border:1px solid var(--border); background: var(--panel-2); }
+      .section-title { font-weight: 600; margin-bottom: 12px; }
+      .small { font-size: 12px; color: var(--muted); }
+      .flex { display:flex; gap:10px; align-items:center; }
+      .space { margin-top: 10px; }
+      .list { display: grid; gap: 8px; }
+      .timer { font-variant-numeric: tabular-nums; font-size: 48px; text-align: center; margin: 10px 0; }
+      .radio-group { display:flex; gap:8px; flex-wrap:wrap; }
+      .radio { padding:8px 10px; border-radius:10px; border:1px solid var(--border); background: var(--panel-2); cursor: pointer; }
+      .radio.active { border-color: var(--primary); background:#0e2238; }
+      .chart-wrap { height: 280px; }
+      .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+      .danger-text { color: var(--danger); }
+      .success-text { color: var(--success); }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">Chronos-Deck 2.0</div>
+        <div class="tagline">AI Study & Task Manager</div>
+        <div class="nav">
+          <button data-view="dashboard" class="active">Dashboard</button>
+          <button data-view="planner">Study Planner</button>
+          <button data-view="focus">Focus Hub</button>
+          <button data-view="forge">Knowledge Forge</button>
+          <button data-view="review">Review Queue</button>
+          <button data-view="settings">Settings</button>
+        </div>
+      </aside>
+      <main class="content">
+        <!-- Dashboard -->
+        <section id="view-dashboard" class="view">
+          <div class="row row-2">
+            <div class="card">
+              <div class="header">
+                <div>
+                  <div class="section-title">Total Study Time by Subject</div>
+                  <div class="small">Aggregated from completed sessions</div>
+                </div>
+                <button class="btn btn-muted" id="btn-refresh-dashboard">Refresh</button>
+              </div>
+              <div class="chart-wrap"><canvas id="chart-time"></canvas></div>
+            </div>
+            <div class="card">
+              <div class="section-title">Recent Quiz Scores</div>
+              <div id="quiz-history" class="list"></div>
+            </div>
+          </div>
+          <div class="row row-2 space">
+            <div class="card">
+              <div class="section-title">Subjects</div>
+              <div class="flex">
+                <input id="subject-name" class="input" placeholder="Subject name" />
+                <input id="subject-color" class="input" type="color" value="#3b82f6" />
+                <button id="add-subject" class="btn btn-primary">Add Subject</button>
+              </div>
+              <div id="subjects-list" class="list space"></div>
+            </div>
+            <div class="card">
+              <div class="section-title">Review Queue</div>
+              <div id="review-list" class="list"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Planner -->
+        <section id="view-planner" class="view" hidden>
+          <div class="card">
+            <div class="section-title">Add Task</div>
+            <div class="row row-3">
+              <input id="task-name" class="input" placeholder="Task name" />
+              <select id="task-subject" class="input"></select>
+              <input id="task-due" class="input" type="datetime-local" />
+            </div>
+            <div class="space flex">
+              <button id="task-add" class="btn btn-primary">Add Task</button>
+              <span class="small">Desktop notifications require permission.</span>
+              <button id="notif-perm" class="btn btn-muted">Grant Notifications</button>
+            </div>
+          </div>
+          <div class="card space">
+            <div class="section-title">Tasks</div>
+            <div id="tasks-list" class="list"></div>
+          </div>
+        </section>
+
+        <!-- Focus Hub -->
+        <section id="view-focus" class="view" hidden>
+          <div class="row row-2">
+            <div class="card">
+              <div class="section-title">Focus Timer</div>
+              <select id="focus-subject" class="input" style="width:100%;"></select>
+              <div class="radio-group space" id="duration-group">
+                <div class="radio" data-min="25">25 min</div>
+                <div class="radio" data-min="5">5 min</div>
+                <div class="radio" data-min="15">15 min</div>
+              </div>
+              <div id="timer-display" class="timer">25:00</div>
+              <div class="flex">
+                <button id="timer-start" class="btn btn-primary">Start</button>
+                <button id="timer-pause" class="btn btn-muted">Pause</button>
+                <button id="timer-reset" class="btn btn-muted">Reset</button>
+              </div>
+              <div class="small space">Completion logs a session and sends a notification.</div>
+            </div>
+            <div class="card">
+              <div class="section-title">Session Options</div>
+              <div class="flex">
+                <button id="noise-toggle" class="btn btn-muted">White Noise: Off</button>
+                <span class="small">Persists across reloads</span>
+              </div>
+              <div class="space">
+                <div class="small">Current Phase: <span id="phase-label">Work</span></div>
+                <div class="small">Remaining: <span id="remaining-label">25:00</span></div>
+              </div>
+              <div class="space">
+                <div class="section-title">Progress</div>
+                <div class="chart-wrap"><canvas id="focus-progress-pie"></canvas></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Knowledge Forge -->
+        <section id="view-forge" class="view" hidden>
+          <div class="row row-2">
+            <div class="card">
+              <div class="section-title">Decks</div>
+              <div class="flex">
+                <input id="deck-name" class="input" placeholder="Deck name" />
+                <button id="deck-add" class="btn btn-primary">Add</button>
+              </div>
+              <div id="decks-list" class="list space"></div>
+            </div>
+            <div class="card">
+              <div class="header">
+                <div class="section-title">Questions – <span id="active-deck-label">None</span></div>
+                <div class="flex">
+                  <select id="quiz-subject" class="input"></select>
+                  <button id="generate-quiz" class="btn btn-primary">Start AI-Generated Quiz</button>
+                </div>
+              </div>
+              <div class="flex">
+                <input id="card-term" class="input" placeholder="Question" />
+                <input id="card-def" class="input" placeholder="Answer" />
+                <button id="card-add" class="btn btn-primary">Add</button>
+              </div>
+              <div id="cards-list" class="list space"></div>
+              <div id="quiz-area" class="space"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Review Queue -->
+        <section id="view-review" class="view" hidden>
+          <div class="card">
+            <div class="section-title">Difficult Cards</div>
+            <div id="review-page-list" class="list"></div>
+          </div>
+        </section>
+
+        <!-- Settings -->
+        <section id="view-settings" class="view" hidden>
+          <div class="card">
+            <div class="section-title">OpenRouter API</div>
+            <div class="flex">
+              <input id="openrouter-key" class="input" placeholder="Paste your OpenRouter API Key" />
+              <button id="save-key" class="btn btn-primary">Save</button>
+            </div>
+            <div class="small space">Model uses <code>openrouter/auto</code>. Quiz generation requires an API key.</div>
+          </div>
+          <div class="card space">
+            <div class="section-title">Gemini API</div>
+            <div class="flex">
+              <input id="gemini-key" class="input" placeholder="Paste your Gemini API Key" />
+              <input id="gemini-model" class="input" value="gemini-2.5-flash-preview-09-2025" />
+              <button id="save-gemini" class="btn btn-primary">Save</button>
+            </div>
+            <div class="small space">Used to generate plausible wrong options (distractors) for MCQs.</div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      // ======= Utilities & Local Storage =======
+      const LS = {
+        get: (k, d=[]) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+        set: (k, v) => localStorage.setItem(k, JSON.stringify(v))
+      };
+      const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+      const fmtISO = (date=new Date()) => date.toISOString();
+      const pad = (n) => String(n).padStart(2, '0');
+      const fmtMinSec = (s) => `${pad(Math.floor(s/60))}:${pad(s%60)}`;
+      const notify = (title, body) => {
+        if (!('Notification' in window)) return;
+        if (Notification.permission !== 'granted') return;
+        try { new Notification(title, { body }); } catch {}
+      };
+
+      // Keys
+      const K = {
+        subjects: 'cd2_subjects',
+        tasks: 'cd2_tasks',
+        decks: 'cd2_decks',
+        cards: (deckId) => `cd2_cards_${deckId}`,
+        sessions: 'cd2_sessions',
+        quizHistory: 'cd2_quiz_history',
+        quizDetails: 'cd2_quiz_details',
+        review: 'cd2_review_queue',
+        timer: 'cd2_timer_state',
+        noise: 'cd2_noise_on',
+        openrouterKey: 'cd2_openrouter_key',
+        geminiKey: 'cd2_gemini_key',
+        geminiModel: 'cd2_gemini_model'
+      };
+
+      // ======= Navigation =======
+      const views = {
+        dashboard: document.getElementById('view-dashboard'),
+        planner: document.getElementById('view-planner'),
+        focus: document.getElementById('view-focus'),
+        forge: document.getElementById('view-forge'),
+        review: document.getElementById('view-review'),
+        settings: document.getElementById('view-settings')
+      };
+      document.querySelectorAll('.nav button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          Object.values(views).forEach(v => v.hidden = true);
+          views[btn.dataset.view].hidden = false;
+        });
+      });
+
+      // ======= Subjects Manager =======
+      const subjectNameEl = document.getElementById('subject-name');
+      const subjectColorEl = document.getElementById('subject-color');
+      const subjectsListEl = document.getElementById('subjects-list');
+      const taskSubjectEl = document.getElementById('task-subject');
+      const focusSubjectEl = document.getElementById('focus-subject');
+      const addSubjectBtn = document.getElementById('add-subject');
+
+      function renderSubjects() {
+        const subs = LS.get(K.subjects, []);
+        subjectsListEl.innerHTML = '';
+        taskSubjectEl.innerHTML = '<option value="">Subject</option>';
+        focusSubjectEl.innerHTML = '<option value="">Subject</option>';
+        const quizSubjectEl = document.getElementById('quiz-subject');
+        if (quizSubjectEl) quizSubjectEl.innerHTML = '<option value="">Subject</option>';
+        subs.forEach(s => {
+          const item = document.createElement('div');
+          item.className = 'pill';
+          const dot = document.createElement('span');
+          dot.style.cssText = `width:12px;height:12px;border-radius:999px;background:${s.color}`;
+          const name = document.createElement('span'); name.textContent = s.name;
+          const del = document.createElement('button'); del.className='btn btn-danger'; del.textContent='Delete';
+          del.addEventListener('click', () => {
+            LS.set(K.subjects, LS.get(K.subjects, []).filter(x => x.id !== s.id));
+            renderSubjects(); renderPlanner();
+          });
+          item.append(dot, name, del);
+          subjectsListEl.appendChild(item);
+          const opt1 = document.createElement('option'); opt1.value = s.name; opt1.textContent = s.name; taskSubjectEl.appendChild(opt1);
+          const opt2 = document.createElement('option'); opt2.value = s.name; opt2.textContent = s.name; focusSubjectEl.appendChild(opt2);
+          if (quizSubjectEl) { const opt3 = document.createElement('option'); opt3.value = s.name; opt3.textContent = s.name; quizSubjectEl.appendChild(opt3); }
+        });
+      }
+      addSubjectBtn.addEventListener('click', () => {
+        const name = subjectNameEl.value.trim();
+        const color = subjectColorEl.value || '#3b82f6';
+        if (!name) return;
+        const subs = LS.get(K.subjects, []);
+        subs.push({ id: uid(), name, color });
+        LS.set(K.subjects, subs);
+        subjectNameEl.value = '';
+        renderSubjects();
+      });
+
+      // ======= Planner =======
+      const taskNameEl = document.getElementById('task-name');
+      const taskDueEl = document.getElementById('task-due');
+      const taskAddBtn = document.getElementById('task-add');
+      const tasksListEl = document.getElementById('tasks-list');
+      const notifPermBtn = document.getElementById('notif-perm');
+
+      notifPermBtn.addEventListener('click', () => {
+        if ('Notification' in window) Notification.requestPermission();
+      });
+
+      function renderPlanner() {
+        const tasks = LS.get(K.tasks, []);
+        tasksListEl.innerHTML = '';
+        tasks.forEach(t => {
+          const row = document.createElement('div'); row.className = 'card';
+          const top = document.createElement('div'); top.className = 'flex';
+          const name = document.createElement('input'); name.className='input'; name.value = t.taskName;
+          name.addEventListener('input', () => { t.taskName = name.value; LS.set(K.tasks, tasks); });
+          const subj = document.createElement('span'); subj.className='pill'; subj.textContent = t.subjectTag || '—';
+          const due = document.createElement('input'); due.type='datetime-local'; due.className='input'; due.value = t.dueDate || '';
+          due.addEventListener('change', () => { t.dueDate = due.value; LS.set(K.tasks, tasks); });
+          const check = document.createElement('button'); check.className='btn btn-primary'; check.textContent = t.isComplete ? 'Mark Incomplete' : 'Mark Complete';
+          check.addEventListener('click', () => { t.isComplete = !t.isComplete; LS.set(K.tasks, tasks); renderPlanner(); });
+          const del = document.createElement('button'); del.className='btn btn-danger'; del.textContent='Delete';
+          del.addEventListener('click', () => { LS.set(K.tasks, tasks.filter(x => x.id !== t.id)); renderPlanner(); });
+          top.append(name, subj, due, check, del);
+          row.append(top);
+          tasksListEl.appendChild(row);
+        });
+      }
+      taskAddBtn.addEventListener('click', () => {
+        const taskName = taskNameEl.value.trim(); const subjectTag = taskSubjectEl.value; const dueDate = taskDueEl.value;
+        if (!taskName || !subjectTag) return;
+        const tasks = LS.get(K.tasks, []);
+        const t = { id: uid(), taskName, subjectTag, dueDate, isComplete: false };
+        tasks.push(t); LS.set(K.tasks, tasks);
+        taskNameEl.value=''; taskSubjectEl.value=''; taskDueEl.value='';
+        if (dueDate && 'Notification' in window && Notification.permission === 'granted') {
+          const when = new Date(dueDate).getTime();
+          const delay = Math.max(0, when - Date.now());
+          setTimeout(() => notify('Task Due', `${taskName} (${subjectTag})`), delay);
+        }
+        renderPlanner();
+      });
+
+      // ======= Focus Hub (Timer + White Noise) =======
+      const durationGroup = document.getElementById('duration-group');
+      const timerDisplay = document.getElementById('timer-display');
+      const phaseLabel = document.getElementById('phase-label');
+      const remainingLabel = document.getElementById('remaining-label');
+      const startBtn = document.getElementById('timer-start');
+      const pauseBtn = document.getElementById('timer-pause');
+      const resetBtn = document.getElementById('timer-reset');
+      const noiseBtn = document.getElementById('noise-toggle');
+
+      let timerInterval = null;
+      let audioCtx = null, noiseSource = null;
+      let focusPieInst = null;
+
+      function setNoise(on) {
+        LS.set(K.noise, !!on);
+        noiseBtn.textContent = `White Noise: ${on ? 'On' : 'Off'}`;
+        if (on) {
+          if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const bufferSize = 2 * audioCtx.sampleRate;
+          const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+          noiseSource = audioCtx.createBufferSource();
+          noiseSource.buffer = buffer; noiseSource.loop = true;
+          const gain = audioCtx.createGain(); gain.gain.value = 0.02;
+          noiseSource.connect(gain).connect(audioCtx.destination);
+          noiseSource.start();
+        } else {
+          try { noiseSource && noiseSource.stop(); } catch {}
+          noiseSource = null;
+        }
+      }
+      noiseBtn.addEventListener('click', () => setNoise(!(LS.get(K.noise, false))));
+
+      function getTimer() { return LS.get(K.timer, { running:false, isBreak:false, durationSec: 25*60, selectedSubject:'', startTs:null, targetTs:null }); }
+      function setTimer(t) { LS.set(K.timer, t); }
+
+      function pickDuration(min) {
+        document.querySelectorAll('#duration-group .radio').forEach(r => r.classList.remove('active'));
+        const el = Array.from(document.querySelectorAll('#duration-group .radio')).find(r => Number(r.dataset.min) === min);
+        if (el) el.classList.add('active');
+        const t = getTimer(); t.durationSec = min*60; setTimer(t); updateTimerUI();
+      }
+      durationGroup.addEventListener('click', (e) => {
+        const r = e.target.closest('.radio'); if (!r) return;
+        pickDuration(Number(r.dataset.min));
+      });
+
+      function updateTimerUI() {
+        const t = getTimer();
+        const remaining = t.targetTs ? Math.max(0, Math.floor((t.targetTs - Date.now())/1000)) : t.durationSec;
+        timerDisplay.textContent = fmtMinSec(remaining);
+        remainingLabel.textContent = fmtMinSec(remaining);
+        phaseLabel.textContent = t.isBreak ? 'Break' : 'Work';
+        // Progress pie chart (elapsed vs remaining)
+        const total = t.durationSec;
+        const elapsed = Math.max(0, total - remaining);
+        const canvas = document.getElementById('focus-progress-pie');
+        if (canvas) {
+          if (focusPieInst) focusPieInst.destroy();
+          focusPieInst = new Chart(canvas, {
+            type: 'doughnut',
+            data: { labels: ['Elapsed', 'Remaining'], datasets: [{ data: [elapsed, Math.max(0, remaining)], backgroundColor: ['#60a5fa', '#0f2a44'] }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#cbd5e1' } } } }
+          });
+        }
+      }
+      function tick() {
+        const t = getTimer();
+        const remaining = Math.max(0, Math.floor((t.targetTs - Date.now())/1000));
+        timerDisplay.textContent = fmtMinSec(remaining);
+        remainingLabel.textContent = fmtMinSec(remaining);
+        if (remaining <= 0) {
+          clearInterval(timerInterval); timerInterval = null;
+          const subject = focusSubjectEl.value || t.selectedSubject || 'General';
+          // Log session only for Work phase
+          if (!t.isBreak) {
+            const sessions = LS.get(K.sessions, []);
+            sessions.push({ id: uid(), subject, duration: Math.floor(t.durationSec/60), timestamp: fmtISO(new Date()) });
+            LS.set(K.sessions, sessions);
+            notify('Session Complete', `${subject}: ${Math.floor(t.durationSec/60)}-minute session finished.`);
+          }
+          // Auto toggle break/work
+          const next = { ...t, running:false, isBreak: !t.isBreak, startTs:null, targetTs:null };
+          // Set default durations (work 25, break 5)
+          next.durationSec = next.isBreak ? 5*60 : 25*60;
+          setTimer(next); updateTimerUI();
+        }
+      }
+      startBtn.addEventListener('click', () => {
+        const subject = focusSubjectEl.value || 'General';
+        const t = getTimer();
+        if (!subject) { alert('Select a subject'); return; }
+        const now = Date.now();
+        const remaining = t.targetTs ? Math.max(0, Math.floor((t.targetTs - now)/1000)) : t.durationSec;
+        const target = now + remaining*1000;
+        setTimer({ ...t, running:true, selectedSubject: subject, startTs: now, targetTs: target });
+        if (!timerInterval) timerInterval = setInterval(tick, 1000);
+        updateTimerUI();
+      });
+      pauseBtn.addEventListener('click', () => {
+        const t = getTimer();
+        const remaining = t.targetTs ? Math.max(0, Math.floor((t.targetTs - Date.now())/1000)) : t.durationSec;
+        clearInterval(timerInterval); timerInterval = null;
+        setTimer({ ...t, running:false, targetTs:null, durationSec: remaining });
+        updateTimerUI();
+      });
+      resetBtn.addEventListener('click', () => {
+        clearInterval(timerInterval); timerInterval = null;
+        setTimer({ running:false, isBreak:false, durationSec:25*60, selectedSubject:'', startTs:null, targetTs:null });
+        updateTimerUI();
+      });
+
+      // Rehydrate timer on load
+      (function initTimer() {
+        const t = getTimer(); pickDuration(Math.floor(t.durationSec/60));
+        if (t.running && t.targetTs && t.targetTs > Date.now()) {
+          timerInterval = setInterval(tick, 1000);
+        }
+        updateTimerUI();
+        setNoise(LS.get(K.noise, false));
+      })();
+
+      // ======= Knowledge Forge (Decks & Cards) =======
+      const deckNameEl = document.getElementById('deck-name');
+      const deckAddBtn = document.getElementById('deck-add');
+      const decksListEl = document.getElementById('decks-list');
+      const activeDeckLabel = document.getElementById('active-deck-label');
+      const cardTermEl = document.getElementById('card-term');
+      const cardDefEl = document.getElementById('card-def');
+      const cardAddBtn = document.getElementById('card-add');
+      const cardsListEl = document.getElementById('cards-list');
+      const quizAreaEl = document.getElementById('quiz-area');
+      const generateQuizBtn = document.getElementById('generate-quiz');
+      const quizSubjectEl = document.getElementById('quiz-subject');
+
+      let activeDeckId = null;
+
+      function renderDecks() {
+        const decks = LS.get(K.decks, []);
+        decksListEl.innerHTML = '';
+        decks.forEach(d => {
+          const row = document.createElement('div'); row.className='card';
+          const top = document.createElement('div'); top.className='flex';
+          const name = document.createElement('span'); name.textContent = d.deckName; name.style.flex='1';
+          const open = document.createElement('button'); open.className='btn btn-primary'; open.textContent='Open';
+          open.addEventListener('click', () => { activeDeckId = d.id; activeDeckLabel.textContent = d.deckName; renderCards(); });
+          const del = document.createElement('button'); del.className='btn btn-danger'; del.textContent='Delete';
+          del.addEventListener('click', () => { LS.set(K.decks, decks.filter(x => x.id !== d.id)); if (activeDeckId === d.id) { activeDeckId=null; activeDeckLabel.textContent='None'; } renderDecks(); renderCards(); });
+          top.append(name, open, del); row.append(top); decksListEl.appendChild(row);
+        });
+      }
+      deckAddBtn.addEventListener('click', () => {
+        const name = deckNameEl.value.trim(); if (!name) return;
+        const decks = LS.get(K.decks, []); decks.push({ id: uid(), deckName: name });
+        LS.set(K.decks, decks); deckNameEl.value=''; renderDecks();
+      });
+
+      function renderCards() {
+        quizAreaEl.innerHTML = '';
+        cardsListEl.innerHTML = '';
+        if (!activeDeckId) return;
+        // keep subject list in sync even if user added subjects after opening the deck
+        renderSubjects();
+        const cards = LS.get(K.cards(activeDeckId), []);
+        cards.forEach(c => {
+          const row = document.createElement('div'); row.className='card';
+          const term = document.createElement('input'); term.className='input'; term.value=c.term;
+          term.addEventListener('input', () => { c.term = term.value; LS.set(K.cards(activeDeckId), cards); });
+          const def = document.createElement('input'); def.className='input'; def.value=c.definition;
+          def.addEventListener('input', () => { c.definition = def.value; LS.set(K.cards(activeDeckId), cards); });
+          const del = document.createElement('button'); del.className='btn btn-danger'; del.textContent='Delete';
+          del.addEventListener('click', () => { LS.set(K.cards(activeDeckId), cards.filter(x => x.id !== c.id)); renderCards(); });
+          const box = document.createElement('div'); box.className='flex'; box.append(term, def, del);
+          row.append(box); cardsListEl.append(row);
+        });
+      }
+      cardAddBtn.addEventListener('click', () => {
+        if (!activeDeckId) return;
+        const term = cardTermEl.value.trim(), definition = cardDefEl.value.trim(); if (!term || !definition) return;
+        const cards = LS.get(K.cards(activeDeckId), []); cards.push({ id: uid(), term, definition }); LS.set(K.cards(activeDeckId), cards);
+        cardTermEl.value=''; cardDefEl.value=''; renderCards();
+      });
+
+      function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+
+      async function geminiDistractors(question, answer, key, model) {
+        const prompt = `You are generating multiple-choice distractors.\nQuestion: ${question}\nCorrect answer: ${answer}\nReturn ONLY a valid JSON array of 3 plausible but WRONG options. Ensure they match the answer type and are concise strings.`;
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] })
+        });
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('\n') || '';
+        let arr = [];
+        try { arr = JSON.parse(text); } catch { const m = text.match(/\[\s*\"?[\s\S]*\"?\s*\]/); arr = m ? JSON.parse(m[0]) : []; }
+        if (!Array.isArray(arr)) arr = [];
+        arr = arr.map(x => String(x)).filter(x => x.trim() && x.trim().toLowerCase() !== String(answer).trim().toLowerCase());
+        while (arr.length < 3) {
+          const a = String(answer);
+          const variants = [a + ' (variant)', a.replace(/\b(\w+)\b/, '$1 alt'), a.split('').reverse().join('')];
+          const pick = variants[Math.floor(Math.random()*variants.length)];
+          if (pick.toLowerCase() !== a.toLowerCase() && !arr.includes(pick)) arr.push(pick);
+        }
+        return arr.slice(0,3);
+      }
+
+      async function generateQuiz() {
+        if (!activeDeckId) return;
+        const subject = quizSubjectEl?.value || '';
+        const cards = LS.get(K.cards(activeDeckId), []);
+        if (!cards.length) { alert('Add questions first.'); return; }
+        if (!subject) { alert('Select a subject for this quiz.'); return; }
+        const gemKey = LS.get(K.geminiKey, '');
+        const gemModel = LS.get(K.geminiModel, 'gemini-2.5-flash-preview-09-2025');
+        if (!gemKey) { alert('Set Gemini API key in Settings.'); return; }
+        const quiz = [];
+        for (const c of cards) {
+          const dis = await geminiDistractors(c.term, c.definition, gemKey, gemModel);
+          const options = shuffle([c.definition, ...dis]);
+          quiz.push({ question: c.term, options, correctAnswer: c.definition });
+        }
+        renderQuiz(quiz, cards, subject);
+      }
+      generateQuizBtn.addEventListener('click', generateQuiz);
+
+      function renderQuiz(quiz, cards, subject) {
+        quizAreaEl.innerHTML = '';
+        const answers = {};
+        const wrap = document.createElement('div');
+        wrap.className = 'card';
+        quiz.forEach((q, idx) => {
+          const box = document.createElement('div'); box.className='card';
+          const title = document.createElement('div'); title.textContent = q.question; title.style.fontWeight='600';
+          const options = document.createElement('div'); options.className='radio-group';
+          q.options.forEach(opt => {
+            const label = document.createElement('div'); label.className='radio'; label.textContent = opt;
+            label.addEventListener('click', ()=>{ answers[idx] = opt; Array.from(options.children).forEach(c=>c.classList.remove('active')); label.classList.add('active'); });
+            options.append(label);
+          });
+          box.append(title, options); wrap.append(box);
+        });
+        const submit = document.createElement('button'); submit.className='btn btn-primary'; submit.textContent='Submit Quiz';
+        submit.addEventListener('click', () => {
+          let correct = 0; const detail = [];
+          quiz.forEach((q, idx) => {
+            const isCorrect = (answers[idx] === q.correctAnswer);
+            if (isCorrect) correct++;
+            detail.push({ question: q.question, options: q.options, selected: answers[idx] || null, correctAnswer: q.correctAnswer, isCorrect });
+          });
+          const pointsPer = 2; const totalPoints = correct * pointsPer; const maxPoints = quiz.length * pointsPer;
+          const score = `${totalPoints}/${maxPoints}`;
+          const hist = LS.get(K.quizHistory, []);
+          const deck = (LS.get(K.decks, []).find(d=>d.id===activeDeckId));
+          const deckName = deck?.deckName || 'Deck';
+          const recordId = uid();
+          hist.push({ id: recordId, deckId: activeDeckId, deckName, subject, score, timestamp: fmtISO(new Date()) }); LS.set(K.quizHistory, hist);
+          const allDetails = LS.get(K.quizDetails, []);
+          allDetails.push({ id: recordId, deckId: activeDeckId, deckName, subject, pointsPer, totalPoints, maxPoints, totalQuestions: quiz.length, timestamp: fmtISO(new Date()), detail });
+          LS.set(K.quizDetails, allDetails);
+          // review queue: add missed cards by term match
+          const missedIdx = quiz.map((q, i) => ({ q, i })).filter(x => answers[x.i] !== x.q.correctAnswer).map(x=>x.q.question);
+          const review = LS.get(K.review, []);
+          cards.forEach(c => {
+            if (missedIdx.some(qtext => qtext.toLowerCase().includes(c.term.toLowerCase()))) {
+              const existing = review.find(r => r.term === c.term && r.definition === c.definition);
+              if (existing) existing.misses = (existing.misses||0)+1; else review.push({ id: uid(), deckId: activeDeckId, term: c.term, definition: c.definition, misses: 1 });
+            }
+          });
+          LS.set(K.review, review);
+          const result = document.createElement('div'); result.className='card';
+          result.innerHTML = `<div class="section-title">Result</div><div>Score: <span class="success-text">${score}</span></div><div class="small">Subject: ${subject || '—'} | Deck: ${deckName}</div>`;
+          quizAreaEl.append(result);
+          renderDashboard(); renderReview();
+        });
+        quizAreaEl.append(wrap, submit);
+      }
+
+      // ======= Dashboard (Chart + Quiz History + Review) =======
+      const chartCanvas = document.getElementById('chart-time');
+      const refreshDashBtn = document.getElementById('btn-refresh-dashboard');
+      const quizHistEl = document.getElementById('quiz-history');
+      const reviewListEl = document.getElementById('review-list');
+      let chartInst = null;
+
+      function renderDashboard() {
+        // Time chart
+        const sessions = LS.get(K.sessions, []);
+        const agg = sessions.reduce((acc, s)=>{ acc[s.subject] = (acc[s.subject]||0) + (s.duration||0); return acc; }, {});
+        const labels = Object.keys(agg), data = Object.values(agg);
+        if (chartInst) chartInst.destroy();
+        chartInst = new Chart(chartCanvas, {
+          type: 'bar',
+          data: { labels, datasets: [{ label: 'Total Study Time (min)', data, backgroundColor: '#60a5fa' }] },
+          options: { responsive:true, maintainAspectRatio:false, scales: { x: { ticks: { color: '#cbd5e1' } }, y: { ticks: { color: '#cbd5e1' } } }, plugins: { legend: { labels: { color: '#cbd5e1' } } } }
+        });
+        // Quiz history
+        const hist = LS.get(K.quizHistory, []).slice().reverse();
+        quizHistEl.innerHTML = '';
+        hist.slice(0, 10).forEach(h => {
+          const row = document.createElement('div'); row.className='card';
+          const left = document.createElement('span'); left.textContent = h.deckName;
+          const right = document.createElement('span'); right.textContent = h.score; right.className = 'pill';
+          const meta = document.createElement('div'); meta.className='small'; meta.textContent = new Date(h.timestamp).toLocaleString();
+          const box = document.createElement('div'); box.className='flex'; box.append(left, right);
+          row.append(box, meta); quizHistEl.append(row);
+        });
+        // Review queue
+        const review = LS.get(K.review, []);
+        reviewListEl.innerHTML='';
+        review.forEach(r => {
+          const row = document.createElement('div'); row.className='card';
+          const title = document.createElement('div'); title.textContent = r.term; title.style.fontWeight='600';
+          const def = document.createElement('div'); def.className='small'; def.textContent = r.definition;
+          const miss = document.createElement('div'); miss.className='small danger-text'; miss.textContent = `Misses: ${r.misses||1}`;
+          row.append(title, def, miss); reviewListEl.append(row);
+        });
+      }
+      refreshDashBtn.addEventListener('click', renderDashboard);
+
+      // Review page
+      const reviewPageListEl = document.getElementById('review-page-list');
+      function renderReview() {
+        const review = LS.get(K.review, []);
+        reviewPageListEl.innerHTML = '';
+        review.forEach(r => {
+          const row = document.createElement('div'); row.className='card';
+          const title = document.createElement('div'); title.textContent = r.term; title.style.fontWeight='600';
+          const def = document.createElement('div'); def.className='small'; def.textContent = r.definition;
+          const actions = document.createElement('div'); actions.className='flex';
+          const done = document.createElement('button'); done.className='btn btn-primary'; done.textContent='Mark Reviewed';
+          done.addEventListener('click', () => { LS.set(K.review, review.filter(x=>x.id!==r.id)); renderReview(); renderDashboard(); });
+          const remove = document.createElement('button'); remove.className='btn btn-danger'; remove.textContent='Remove';
+          remove.addEventListener('click', () => { LS.set(K.review, review.filter(x=>x.id!==r.id)); renderReview(); renderDashboard(); });
+          actions.append(done, remove);
+          row.append(title, def, actions); reviewPageListEl.append(row);
+        });
+      }
+
+      // ======= Settings =======
+      const keyEl = document.getElementById('openrouter-key');
+      const saveKeyBtn = document.getElementById('save-key');
+      keyEl.value = LS.get(K.openrouterKey, '');
+      saveKeyBtn.addEventListener('click', () => { LS.set(K.openrouterKey, keyEl.value.trim()); alert('API key saved.'); });
+      // Gemini settings
+      const gemKeyEl = document.getElementById('gemini-key');
+      const gemModelEl = document.getElementById('gemini-model');
+      const gemSaveBtn = document.getElementById('save-gemini');
+      if (gemKeyEl && gemModelEl && gemSaveBtn) {
+        gemKeyEl.value = LS.get(K.geminiKey, '');
+        gemModelEl.value = LS.get(K.geminiModel, 'gemini-2.5-flash-preview-09-2025');
+        gemSaveBtn.addEventListener('click', () => { LS.set(K.geminiKey, gemKeyEl.value.trim()); LS.set(K.geminiModel, gemModelEl.value.trim()); alert('Gemini settings saved.'); });
+      }
+
+      // ======= Initial Render =======
+      function boot() {
+        renderSubjects();
+        renderPlanner();
+        renderDecks();
+        renderCards();
+        renderDashboard();
+        renderReview();
+        pickDuration(Math.floor(getTimer().durationSec/60));
+      }
+      boot();
+    </script>
+  </body>
+</html>
